@@ -281,8 +281,14 @@ return_code_t initialize_sip_client(struct sip_config *cfg)
     /* Start PJSIP threads - one for monitoring the connection
      * and another one for tracking call requests from a queue.
      */
-    pthread_create(&sip_call_thread, NULL, pjsip_call_thread, NULL);
-    pthread_create(&sip_connection_thread, NULL, pjsip_connection_thread, NULL);
+    rc = pthread_create(&sip_call_thread, NULL, pjsip_call_thread, NULL);
+    if (rc != RC_OK)
+        return RC_FAILURE;
+
+    rc = pthread_create(&sip_connection_thread, NULL, pjsip_connection_thread, NULL);
+    if (rc != RC_OK)
+        return RC_FAILURE;
+
     return RC_OK;
 }
 
