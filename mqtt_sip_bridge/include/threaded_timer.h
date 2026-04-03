@@ -19,10 +19,15 @@ struct thread_timer_t {
     int seconds;
     void (*callback)(pjsua_call_id);
     pthread_t thread;
-    atomic_int canceled;
     pjsua_call_id call_id;
+
+    /* These 2 fields should be protected by the mutex */
+    bool cancelled;
+    unsigned milliseconds_left;
+
+    pthread_mutex_t mutex;
 };
 
-int timer_start(struct thread_timer_t *t);
+int threaded_timer_create(struct thread_timer_t *t);
 
 #endif

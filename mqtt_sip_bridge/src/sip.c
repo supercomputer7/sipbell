@@ -31,7 +31,6 @@ uint8_t call_timeout_seconds = 10;
 typedef struct {
     struct thread_timer_t timer;
 } call_context_t;
-pthread_mutex_t g_call_map_mutex = PTHREAD_MUTEX_INITIALIZER;
 call_context_t g_call_map[PJSUA_MAX_CALLS];
 
 // --- SIP connection flags ---
@@ -116,11 +115,14 @@ void* pjsip_call_thread(void* arg)
                 call_settings.aud_cnt = 1;
                 call_settings.vid_cnt = 0;
                 call_settings.flag |= PJSUA_CALL_INCLUDE_DISABLED_MEDIA;
-                pjsua_call_make_call(acc_id, &dest_uri, &call_settings, NULL, NULL, NULL);
+                status = pjsua_call_make_call(acc_id, &dest_uri, &call_settings, NULL, NULL, NULL);
+                if (status != PJ_SUCCESS) {
+                    fprintf(stderr, "[SIP] Making call failed (not registered, transport issue or too many calls at once)\n");
+                }
                 break;
             case ACTION_HANGUP:
                 printf("[SIP] Hanging up call %d\n", a.call_id);
-                pj_status_t status =  pjsua_call_hangup(a.call_id, 0, NULL, NULL);
+                status = pjsua_call_hangup(a.call_id, 0, NULL, NULL);
                 if (status != PJ_SUCCESS) {
                     fprintf(stderr, "[SIP] Call hangup failed (not registered or transport issue)\n");
                 }
@@ -157,24 +159,20 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
 
     if (ci.state == PJSIP_INV_STATE_DISCONNECTED) {
         printf("[SIP] Call %d disconnected\n", call_id);
-        pthread_mutex_lock(&g_call_map_mutex);
         struct thread_timer_t *t = &g_call_map[call_id].timer;
-        atomic_store(&t->canceled, 1);
-        pthread_mutex_unlock(&g_call_map_mutex);
+        pthread_mutex_lock(&t->mutex);
+        t->cancelled = true;
+        t->milliseconds_left = 0;
+        pthread_mutex_unlock(&t->mutex);
     } else if (ci.state == PJSIP_INV_STATE_CALLING) {
-        printf("[SIP] Call started\n");
+        printf("[SIP] Call %d started\n", call_id);
 
         // We now are ringing, queue a timer to stop it after the specified timeout!
-        pthread_mutex_lock(&g_call_map_mutex);
         struct thread_timer_t *t = &g_call_map[call_id].timer;
-        atomic_store(&t->canceled, 0);
-        if (timer_start(t) != 0) {
-            action_t a = { .type = ACTION_HANGUP, .call_id = call_id };
-            printf("[SIP] Failed to start a timer thread, hangup immediately...\n");
-            queue_push(&g_sip_queue, a);
-            return;
-        }
-        pthread_mutex_unlock(&g_call_map_mutex);
+        pthread_mutex_lock(&t->mutex);
+        t->cancelled = false;
+        t->milliseconds_left = 1000 * call_timeout_seconds;
+        pthread_mutex_unlock(&t->mutex);
 
     } else if (ci.state == PJSIP_INV_STATE_CONFIRMED) {
         printf("[SIP] Call confirmed\n");
@@ -257,17 +255,26 @@ return_code_t initialize_sip_client(struct sip_config *cfg)
 {
     call_timeout_seconds = cfg->call_timeout_seconds;
     sip_dest = cfg->callee_uri;
+    int rc;
 
     for (int i = 0; i < PJSUA_MAX_CALLS; i++) {
         struct thread_timer_t* t = &g_call_map[i].timer;
         t->seconds = call_timeout_seconds;
         t->callback = stop_call;
         t->call_id = i;
-        atomic_init(&t->canceled, 0);
+        t->cancelled = true;
+        t->milliseconds_left = 0;
+        rc = pthread_mutex_init(&t->mutex, NULL);
+        if (rc < 0)
+            return RC_FAILURE;
+
+        rc = threaded_timer_create(t);
+        if (rc < 0)
+            return RC_FAILURE;
     }
 
     /* Initialize PJSIP with our runtime configuration */
-    int rc = pjsip_init_app(cfg);
+    rc = pjsip_init_app(cfg);
     if (rc != RC_OK)
         return RC_FAILURE;
 
@@ -283,5 +290,11 @@ void stop_sip_client()
 {
     pthread_join(sip_call_thread, NULL);
     pthread_join(sip_connection_thread, NULL);
+
+    for (int i = 0; i < PJSUA_MAX_CALLS; i++) {
+        struct thread_timer_t* t = &g_call_map[i].timer;
+        pthread_mutex_destroy(&t->mutex);
+    }
+
     pjsua_destroy();
 }
