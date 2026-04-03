@@ -189,6 +189,15 @@ member = PJSIP/user3
 member = PJSIP/user4
 ```
 
+## Testing without a button click
+
+Since this is all driven by MQTT messages, you install `mosquitto` on
+your Linux machine and do this command:
+
+```sh
+mosquitto_pub -h HOST -u USER -P PASS -t home/doorbell/ring -m RING
+```
+
 ## Licenses & Why no prebuilt binaries
 
 This project is licensed under the MIT license. See LICENSE for more details.
