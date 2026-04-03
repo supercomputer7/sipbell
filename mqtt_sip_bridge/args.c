@@ -29,6 +29,7 @@ void print_usage(const char *prog) {
     printf("  -S <sip_secret>     SIP password\n");
     printf("  -C <callee>        SIP callee ID (default: joe)\n");
     printf("  -T                 Use TCP transport (default: UDP)\n");
+    printf("  -l                 SIP log level in range of 0-4 (default: 0)\n");
 
     printf("\nCall behavior:\n");
     printf("  -w <seconds>       Call duration before hangup (default: 5 seconds)\n");
@@ -72,6 +73,8 @@ return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, str
 
     strcpy(sip_cfg->user, "example");
     sip_cfg->pass[0] = '\0';
+
+    sip_cfg->log_level = 0;
     
     strcpy(sip_cfg->callee_uri, "sip:joe@localhost");
     strcpy(sip_callee_id, "joe");
@@ -81,7 +84,7 @@ return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, str
 
     int opt;
 
-    while ((opt = getopt(argc, argv, "b:P:t:u:p:R:O:U:S:C:Tw:h")) != -1) {
+    while ((opt = getopt(argc, argv, "b:P:t:u:p:R:O:U:l:S:C:Tw:h")) != -1) {
         switch (opt) {
             case 'b': {
                 strncpy(mqtt_cfg->broker, optarg, sizeof(mqtt_cfg->broker)-1);
@@ -136,6 +139,16 @@ return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, str
                     return RC_FAILURE;
                 }
                 sip_cfg->call_timeout_seconds = val;
+                break;
+            }
+
+            case 'l': {
+                int val = atoi(optarg);
+                if (val < 0 || val > 4) {
+                    fprintf(stderr, "Invalid SIP log level\n");
+                    return RC_FAILURE;
+                }
+                sip_cfg->log_level = val;
                 break;
             }
 

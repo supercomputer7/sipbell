@@ -24,6 +24,8 @@ struct sip_config {
     bool use_tcp_transport;
 
     uint8_t call_timeout_seconds;
+
+    uint8_t log_level;
 };
 
 return_code_t initialize_sip_client(struct sip_config *cfg);

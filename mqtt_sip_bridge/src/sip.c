@@ -192,8 +192,8 @@ int pjsip_init_app(struct sip_config *run_cfg)
     cfg.cb.on_incoming_call = NULL;
 
     pjsua_logging_config_default(&log_cfg);
-    log_cfg.console_level = 0;
-    log_cfg.level = 0;
+    log_cfg.console_level = run_cfg->log_level;
+    log_cfg.level = run_cfg->log_level;
 
     pjsua_init(&cfg, &log_cfg, NULL);
 
