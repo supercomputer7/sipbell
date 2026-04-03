@@ -157,6 +157,38 @@ cmake -B build -S . -DPAHO_WITH_SSL=ON
 
 And configure MQTTClient_SSLOptions accordingly.
 
+## PBX configuration
+
+I use Asterisk as it is a well-tested open-source PBX product. I configured my
+dialplan to look like this:
+
+```
+exten => SOME_EXTENSION_NUMBER,1,NoOp
+same => n,Queue(doorbell,,,,400)
+same => n,Hangup
+```
+
+Ensure you don't do something like this (adding Answer directive in between):
+```
+exten => SOME_EXTENSION_NUMBER,1,NoOp
+same => n,Answer()
+same => n,Queue(doorbell,,,,400)
+same => n,Hangup
+```
+
+As it will probably try to negotiate audio codecs immediately, and the PBX will just hangup
+the call immediately with the bridge.
+
+Don't forget to actually define a queue in queues.conf. It should look like this:
+```
+[doorbell]
+strategy = ringall
+member = PJSIP/user1
+member = PJSIP/user2
+member = PJSIP/user3
+member = PJSIP/user4
+```
+
 ## Licenses & Why no prebuilt binaries
 
 This project is licensed under the MIT license. See LICENSE for more details.
