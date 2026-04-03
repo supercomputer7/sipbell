@@ -110,7 +110,13 @@ void* pjsip_call_thread(void* arg)
             case ACTION_CALL:
                 printf("[SIP] Making call\n");
                 pj_str_t dest_uri = pj_str(sip_dest);
-                pjsua_call_make_call(acc_id, &dest_uri, 0, NULL, NULL, NULL);
+
+                pjsua_call_setting call_settings;
+                pjsua_call_setting_default(&call_settings);
+                call_settings.aud_cnt = 1;
+                call_settings.vid_cnt = 0;
+                call_settings.flag |= PJSUA_CALL_INCLUDE_DISABLED_MEDIA;
+                pjsua_call_make_call(acc_id, &dest_uri, &call_settings, NULL, NULL, NULL);
                 break;
             case ACTION_HANGUP:
                 printf("[SIP] Hanging up call %d\n", a.call_id);
@@ -155,8 +161,8 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
         struct thread_timer_t *t = &g_call_map[call_id].timer;
         atomic_store(&t->canceled, 1);
         pthread_mutex_unlock(&g_call_map_mutex);
-    } else if (ci.state == PJSIP_INV_STATE_EARLY) {
-        printf("[SIP] Call ringing\n");
+    } else if (ci.state == PJSIP_INV_STATE_CALLING) {
+        printf("[SIP] Call started\n");
 
         // We now are ringing, queue a timer to stop it after the specified timeout!
         pthread_mutex_lock(&g_call_map_mutex);
@@ -194,6 +200,9 @@ int pjsip_init_app(struct sip_config *run_cfg)
     pjsua_logging_config_default(&log_cfg);
     log_cfg.console_level = run_cfg->log_level;
     log_cfg.level = run_cfg->log_level;
+
+    pjsua_media_config media_cfg;
+    pjsua_media_config_default(&media_cfg);
 
     pjsua_init(&cfg, &log_cfg, NULL);
 
