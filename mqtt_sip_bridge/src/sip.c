@@ -230,8 +230,6 @@ int pjsip_init_app(struct sip_config *run_cfg)
     acc_cfg.cred_info[0].data_type = PJSIP_CRED_DATA_PLAIN_PASSWD;
     acc_cfg.cred_info[0].data = pj_str(run_cfg->pass);
 
-    printf("t %s\n", run_cfg->id);
-
     /* Force TCP transport */
     acc_cfg.transport_id = tcp_id;
 
