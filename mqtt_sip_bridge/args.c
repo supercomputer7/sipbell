@@ -23,13 +23,13 @@ void print_usage(const char *prog) {
     printf("  -p <pass>          MQTT password (default: empty)\n");
 
     printf("\nSIP options:\n");
-    printf("  -R <sip_host>       SIP server (default: localhost)\n");
-    printf("  -O <sip_port>       SIP port (default: 5060)\n");
-    printf("  -U <sip_user>       SIP username (default: example)\n");
-    printf("  -S <sip_secret>     SIP password\n");
-    printf("  -C <callee>        SIP callee ID (default: joe)\n");
-    printf("  -T                 Use TCP transport (default: UDP)\n");
-    printf("  -l                 SIP log level in range of 0-4 (default: 0)\n");
+    printf("  -R <sip_host>                SIP server (default: localhost)\n");
+    printf("  -O <sip_local_listen_port>   SIP local listen port (default: 5060)\n");
+    printf("  -U <sip_user>                SIP username (default: example)\n");
+    printf("  -S <sip_secret>              SIP password\n");
+    printf("  -C <callee>                  SIP callee ID (default: joe)\n");
+    printf("  -T                    Use TCP transport (default: UDP)\n");
+    printf("  -l                    SIP log level in range of 0-4 (default: 0)\n");
 
     printf("\nCall behavior:\n");
     printf("  -w <seconds>       Call duration before hangup (default: 5 seconds)\n");
