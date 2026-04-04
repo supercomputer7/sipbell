@@ -51,7 +51,7 @@ void subscribe_failure(void* context, MQTTAsync_failureData* response) {
 
 int mqtt_subscribe_safe(MQTTAsync client, const char* topic, int qos) {
     if (!g_mqtt_connected) {
-        printf("[MQTT] Cannot subscribe, client not connected.\n");
+        fprintf(stderr, "[MQTT] Cannot subscribe, client not connected.\n");
         return 0;
     }
 
@@ -72,17 +72,17 @@ int mqtt_subscribe_safe(MQTTAsync client, const char* topic, int qos) {
 void on_mqtt_connect(void* context, MQTTAsync_successData* response) {
     MQTTAsync client = (MQTTAsync)context;
 
-    printf("[MQTT] Connected to broker\n");
+    fprintf(stderr, "[MQTT] Connected to broker\n");
     g_mqtt_connected = true;
 
     // Always try to subscribe whenever we connect/reconnect
     if (mqtt_subscribe_safe((MQTTAsync)context, s_cfg->topic, 1)) {
-        printf("[MQTT] Subscribe request scheduled.\n");
+        fprintf(stderr, "[MQTT] Subscribe request scheduled.\n");
     }
 }
 
 void on_mqtt_disconnect(void* context, MQTTAsync_failureData* response) {
-    printf("MQTT: connection failed, rc=%d\n", response ? response->code : -1);
+    fprintf(stderr, "MQTT: connection failed, rc=%d\n", response ? response->code : -1);
     g_mqtt_connected = false;
 }
 
@@ -140,7 +140,7 @@ static return_code_t mqtt_client_connect(int max_retries) {
             if (rc != MQTTASYNC_SUCCESS) {
                 fprintf(stderr, "[MQTT] Connect attempt %d failed to start, rc=%d\n", attempt + 1, rc);
             } else {
-                printf("[MQTT] Connect attempt %d scheduled...\n", attempt + 1);
+                fprintf(stderr, "[MQTT] Connect attempt %d scheduled...\n", attempt + 1);
             }
 
             rc = wait_five_seconds(&g_mqtt_connected);
@@ -151,12 +151,12 @@ static return_code_t mqtt_client_connect(int max_retries) {
                 return RC_OK; // success
                 
             attempt++;
-            printf("[MQTT] Connect attempt %d failed, retrying in %d seconds...\n", attempt, MQTT_RETRY_DELAY);
+            fprintf(stderr, "[MQTT] Connect attempt %d failed, retrying in %d seconds...\n", attempt, MQTT_RETRY_DELAY);
             sleep(MQTT_RETRY_DELAY);
         }
     }
 
-    printf("[MQTT] Failed to connect after %d attempts\n", max_retries);
+    fprintf(stderr, "[MQTT] Failed to connect after %d attempts\n", max_retries);
     return RC_FAILURE; // success
 }
 
@@ -183,7 +183,7 @@ return_code_t mqtt_client_connect_and_subscribe(int max_retries)
             return RC_OK; // success
             
         attempt++;
-        printf("[MQTT] Subscribe attempt %d failed, retrying in %d seconds...\n", attempt, MQTT_RETRY_DELAY);
+        fprintf(stderr, "[MQTT] Subscribe attempt %d failed, retrying in %d seconds...\n", attempt, MQTT_RETRY_DELAY);
         sleep(MQTT_RETRY_DELAY);
     }
 

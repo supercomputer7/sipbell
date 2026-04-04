@@ -42,7 +42,7 @@ volatile int g_sip_fatally_shutdown = 0;
 void stop_call(pjsua_call_id timed_call_id)
 {
     action_t a = { .type = ACTION_HANGUP, .call_id = timed_call_id };
-    printf("[SIP] Attempting to stop a RINGING call...\n");
+    fprintf(stderr, "[SIP] Attempting to stop a RINGING call...\n");
     queue_push(&g_sip_queue, a);
 }
 
@@ -53,7 +53,7 @@ static void start_registration()
 
     g_sip_registering = 1;
     if (!g_sip_registered && acc_id != PJSUA_INVALID_ID) {
-        printf("[SIP] Attempting to register/re-register...\n");
+        fprintf(stderr, "[SIP] Attempting to register/re-register...\n");
         pjsua_acc_set_registration(acc_id, PJ_TRUE);
     }
 }
@@ -67,7 +67,7 @@ void* pjsip_connection_thread(void* arg)
     // Register the thread with PJSIP
     status = pj_thread_register("connection_thread", desc, &thread);
     if (status != PJ_SUCCESS) {
-        printf("Failed to register thread\n");
+        fprintf(stderr, "Failed to register thread\n");
         return NULL;
     }
 
@@ -76,11 +76,11 @@ void* pjsip_connection_thread(void* arg)
         pjsua_handle_events(100);
         if (!g_sip_registered && !g_sip_registering) {
             if (retry_count < 3) {
-                printf("[SIP] Trying to register (attempt %d)...\n", retry_count + 1);
+                fprintf(stderr, "[SIP] Trying to register (attempt %d)...\n", retry_count + 1);
                 start_registration();
                 retry_count++;
             } else {
-                printf("[SIP] Registration failed after retries\n");
+                fprintf(stderr, "[SIP] Registration failed after retries\n");
                 g_sip_fatally_shutdown = 1;
                 pause();
             }
@@ -99,7 +99,7 @@ void* pjsip_call_thread(void* arg)
     // Register the thread with PJSIP
     status = pj_thread_register("call_thread", desc, &thread);
     if (status != PJ_SUCCESS) {
-        printf("Failed to register thread\n");
+        fprintf(stderr, "Failed to register thread\n");
         return NULL;
     }
 
@@ -107,7 +107,7 @@ void* pjsip_call_thread(void* arg)
         action_t a = queue_pop(&g_sip_queue);
         switch (a.type) {
             case ACTION_CALL:
-                printf("[SIP] Making call\n");
+                fprintf(stderr, "[SIP] Making call\n");
                 pj_str_t dest_uri = pj_str(sip_dest);
 
                 pjsua_call_setting call_settings;
@@ -121,7 +121,7 @@ void* pjsip_call_thread(void* arg)
                 }
                 break;
             case ACTION_HANGUP:
-                printf("[SIP] Hanging up call %d\n", a.call_id);
+                fprintf(stderr, "[SIP] Hanging up call %d\n", a.call_id);
                 status = pjsua_call_hangup(a.call_id, 0, NULL, NULL);
                 if (status != PJ_SUCCESS) {
                     fprintf(stderr, "[SIP] Call hangup failed (not registered or transport issue)\n");
@@ -138,11 +138,11 @@ void on_reg_state(pjsua_acc_id acc_id)
     pjsua_acc_get_info(acc_id, &info);
 
     if (info.status == 200) {
-        printf("[SIP] Registered successfully\n");
+        fprintf(stderr, "[SIP] Registered successfully\n");
         g_sip_registered = 1;
         g_sip_registering = 0;
     } else {
-        printf("[SIP] Registration failed: %d (%.*s)\n",
+        fprintf(stderr, "[SIP] Registration failed: %d (%.*s)\n",
                info.status,
                (int)info.status_text.slen,
                info.status_text.ptr);
@@ -158,14 +158,14 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
     pjsua_call_get_info(call_id, &ci);
 
     if (ci.state == PJSIP_INV_STATE_DISCONNECTED) {
-        printf("[SIP] Call %d disconnected\n", call_id);
+        fprintf(stderr, "[SIP] Call %d disconnected\n", call_id);
         struct thread_timer_t *t = &g_call_map[call_id].timer;
         pthread_mutex_lock(&t->mutex);
         t->cancelled = true;
         t->milliseconds_left = 0;
         pthread_mutex_unlock(&t->mutex);
     } else if (ci.state == PJSIP_INV_STATE_CALLING) {
-        printf("[SIP] Call %d started\n", call_id);
+        fprintf(stderr, "[SIP] Call %d started\n", call_id);
 
         // We now are ringing, queue a timer to stop it after the specified timeout!
         struct thread_timer_t *t = &g_call_map[call_id].timer;
@@ -175,9 +175,9 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
         pthread_mutex_unlock(&t->mutex);
 
     } else if (ci.state == PJSIP_INV_STATE_CONFIRMED) {
-        printf("[SIP] Call confirmed\n");
+        fprintf(stderr, "[SIP] Call confirmed\n");
     } else if (ci.state == PJSIP_INV_STATE_CONNECTING) {
-        printf("[SIP] Call connecting\n");
+        fprintf(stderr, "[SIP] Call connecting\n");
     }
 }
 
@@ -215,7 +215,7 @@ int pjsip_init_app(struct sip_config *run_cfg)
     }
 
     if (status != PJ_SUCCESS) {
-        printf("Error creating transport for SIP\n");
+        fprintf(stderr, "Error creating transport for SIP\n");
         return RC_FAILURE;
     }
 
@@ -243,11 +243,11 @@ int pjsip_init_app(struct sip_config *run_cfg)
     status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &acc_id);
 
     if (status != PJ_SUCCESS) {
-        printf("SIP Account add failed\n");
+        fprintf(stderr, "SIP Account add failed\n");
         return RC_FAILURE;
     }
 
-    printf("SIP TCP client running...\n");
+    fprintf(stderr, "SIP TCP client running...\n");
     return RC_OK;
 }
 
