@@ -8,7 +8,6 @@
 #include <stdbool.h>
 #include <pjsua-lib/pjsua.h>
 #include <signal.h>
-#include <fcntl.h>
 
 #include "sip.h"
 #include "sip_queue.h"
@@ -218,22 +217,6 @@ static void on_call_state(pjsua_call_id call_id, pjsip_event *e)
     }
 }
 
-void suppress_stderr_start(int *saved_stderr) {
-    fflush(stderr);
-    *saved_stderr = dup(fileno(stderr));
-    int null_fd = open("/dev/null", O_WRONLY);
-    if (null_fd != -1) {
-        dup2(null_fd, fileno(stderr));
-        close(null_fd);
-    }
-}
-
-void suppress_stderr_end(int saved_stderr) {
-    fflush(stderr);
-    dup2(saved_stderr, fileno(stderr));
-    close(saved_stderr);
-}
-
 int pjsip_init_app(struct sip_config *run_cfg)
 {
     pjsua_config cfg;
@@ -255,14 +238,7 @@ int pjsip_init_app(struct sip_config *run_cfg)
     pjsua_media_config media_cfg;
     pjsua_media_config_default(&media_cfg);
 
-    /* FIXME: We suppress all ALSA/JACK warnings during pjsua_init because it apparently
-     * tries to connect to a JACK server (which is not present on many Linux setups these days)
-     * so let's make it silent for this moment.
-     */
-    int saved_stderr;
-    suppress_stderr_start(&saved_stderr);
     pjsua_init(&cfg, &log_cfg, NULL);
-    suppress_stderr_end(saved_stderr);
 
     pjsua_transport_config tcfg;
     pjsua_transport_config_default(&tcfg);
