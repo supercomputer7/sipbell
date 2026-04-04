@@ -279,11 +279,11 @@ int pjsip_init_app(struct sip_config *run_cfg)
     status = pjsua_acc_add(&acc_cfg, PJ_TRUE, &acc_id);
 
     if (status != PJ_SUCCESS) {
-        fprintf(stderr, "SIP Account add failed\n");
+        fprintf(stderr, "[SIP] Account add failed\n");
         return RC_FAILURE;
     }
 
-    fprintf(stderr, "SIP TCP client running...\n");
+    fprintf(stderr, "[SIP] Client running...\n");
     return RC_OK;
 }
 
