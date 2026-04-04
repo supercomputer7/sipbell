@@ -33,5 +33,8 @@ COPY . /app
 # Build
 RUN cmake -B build && cmake --build build -- -j$(nproc)
 
+RUN sh -c 'echo "/usr/local/lib" > /etc/ld.so.conf.d/usr-local-lib.conf'
+RUN ldconfig
+
 # Runtime
-CMD ["./build/doorbell_mqtt_sip_bridge"]
+CMD ["./Build/doorbell_mqtt_sip_bridge"]
