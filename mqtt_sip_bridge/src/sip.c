@@ -88,7 +88,7 @@ void* pjsip_registration_thread(void* arg)
             } else {
                 fprintf(stderr, "[SIP] Registration failed after retries\n");
                 g_sip_fatally_shutdown = 1;
-                pause();
+                break;
             }
 
             retry_count = 0;
