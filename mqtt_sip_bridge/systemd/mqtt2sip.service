@@ -1,0 +1,12 @@
+[Unit]
+Description=Doorbell MQTT2SIP bridge
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=BINARTY_PATH/doorbell_mqtt_sip_bridge -R SIP_HOST -U SIP_USER -S SIP_PASSWORD -b MQTT_BROKER -t home/doorbell/ring -u MQTT_USER -p MQTT_PASSWORD -C CALLEE_EXTENSION_NUMBER -i MQTT_UNIQUE_ID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
