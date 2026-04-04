@@ -80,19 +80,19 @@ void* pjsip_registration_thread(void* arg)
     unsigned retry_count = 0;
     while (!g_sip_stop_registration_thread) {
         pjsua_handle_events(100);
-        if (!g_sip_registered && !g_sip_registering) {
+        while (!g_sip_registered && !g_sip_registering) {
             if (retry_count < 3) {
                 fprintf(stderr, "[SIP] Trying to register (attempt %d)...\n", retry_count + 1);
                 start_registration();
                 retry_count++;
+                sleep(3);
             } else {
                 fprintf(stderr, "[SIP] Registration failed after retries\n");
                 g_sip_fatally_shutdown = 1;
-                break;
+                return NULL;
             }
-
-            retry_count = 0;
         }
+        retry_count = 0;
     }
 
     fprintf(stderr, "[SIP] Exiting registration thread\n");

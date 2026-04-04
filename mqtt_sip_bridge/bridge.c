@@ -82,6 +82,10 @@ int main(int argc, char* argv[]) {
         sleep(1); // Keep main thread alive
     }
 
+    // If we had not set this until point (maybe because MQTT or SIP has dropped their connections)
+    // set it now.
+    g_stop = 1;
+
     printf("\n");
 
     stop_sip_client();
