@@ -17,3 +17,6 @@ target_link_libraries(doorbell_mqtt_sip_bridge
 )
 
 add_compile_definitions(PJ_HAS_LIMITS_H=1)
+
+# Remove this when debug messages are needed for PJLIB
+add_compile_definitions(DISABLE_PJLIB_DEBUG_MESSAGES=1)

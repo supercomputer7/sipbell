@@ -10,6 +10,10 @@
 #include <string.h>
 #include <signal.h>
 
+#ifdef DISABLE_PJLIB_DEBUG_MESSAGES
+#   include <pjsua-lib/pjsua.h>
+#endif
+
 #include "sip.h"
 #include "mqtt.h"
 #include "defs.h"
@@ -29,6 +33,10 @@ void handle_sigint(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+#ifdef DISABLE_PJLIB_DEBUG_MESSAGES
+    pj_log_set_level(0);
+#endif
+
     struct sigaction sa;
     sa.sa_handler = handle_sigint;
     sigemptyset(&sa.sa_mask);
