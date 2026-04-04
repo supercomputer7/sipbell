@@ -16,6 +16,8 @@
 
 extern volatile bool g_mqtt_connected;
 extern volatile int g_sip_connected;
+
+extern volatile int g_mqtt_fatally_shutdown;
 extern volatile int g_sip_fatally_shutdown;
 
 extern return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, struct mqtt_config *mqtt_cfg);
@@ -54,22 +56,13 @@ int main(int argc, char* argv[]) {
     if (rc != RC_OK)
         return 1;
 
-    // We initiate a first call to this function just to initiate a connection
-    rc = mqtt_client_connect_and_subscribe(RETRY_MAX);
-    if (rc != RC_OK)
-        return 1;
-
     fprintf(stdout, "Running... Press Ctrl+C to stop\n");
     
     while (!g_stop) {
-        if (!g_mqtt_connected) {
-            fprintf(stderr,"[MAIN] MQTT disconnected, trying to reconnect...\n");
-            rc = mqtt_client_connect_and_subscribe(RETRY_MAX);
-            if (rc != RC_OK) {
-                fprintf(stderr,"[MAIN] MQTT disconnected, failed to reconnect...\n");
-                exit_code = 1;
-                break;
-            }
+        if (g_mqtt_fatally_shutdown) {
+            fprintf(stderr,"[MAIN] MQTT is not connecting, cannot proceed...\n");
+            exit_code = 1;
+            break;
         }
 
         if (g_sip_fatally_shutdown) {

@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
 #include "MQTTAsync.h"
 #include "defs.h"
@@ -16,13 +17,20 @@
 
 static MQTTAsync s_client;
 
+pthread_t mqtt_connection_monitoring_thread;
+
 struct mqtt_config *s_cfg;
 
 extern volatile int g_call_request;
 extern action_queue_t g_sip_queue;
 
 volatile bool g_mqtt_connected = false;
-volatile bool s_subscribed = 0;
+volatile bool g_mqtt_started = true;
+volatile sig_atomic_t g_stop_mqtt = 0;
+
+volatile int g_mqtt_fatally_shutdown = 0;
+
+static volatile bool s_subscribed = 0;
 
 int mqtt_message_callback(void *context, char *topicName, int topicLen, MQTTAsync_message *message) {
     if (strcmp(topicName, s_cfg->topic) == 0) {
@@ -89,16 +97,6 @@ void on_mqtt_disconnect(void* context, MQTTAsync_failureData* response) {
 void connection_lost(void *context, char *cause) {
     fprintf(stderr, "MQTT connection lost: %s\n", cause ? cause : "unknown");
     g_mqtt_connected = false;
-}
-
-return_code_t initailize_mqtt_client(struct mqtt_config *cfg)
-{
-    s_cfg = cfg;
-    // --- Initialize MQTT ---
-    MQTTAsync_create(&s_client, cfg->broker, cfg->client_string_id, MQTTCLIENT_PERSISTENCE_NONE, NULL);
-    MQTTAsync_setCallbacks(s_client, s_client, connection_lost, mqtt_message_callback, NULL);
-
-    return RC_OK;
 }
 
 static return_code_t wait_five_seconds(volatile bool *flag)
@@ -188,6 +186,47 @@ return_code_t mqtt_client_connect_and_subscribe(int max_retries)
     }
 
     return RC_FAILURE;
+}
+
+void* connection_monitoring_thread(void*)
+{
+    int rc;
+    while (!g_stop_mqtt) {
+        if (!g_mqtt_connected) {
+            if (!g_mqtt_started)
+                fprintf(stderr,"[MAIN] MQTT disconnected, trying to reconnect...\n");
+            else
+                g_mqtt_started = false;
+
+            rc = mqtt_client_connect_and_subscribe(RETRY_MAX);
+            if (rc != RC_OK) {
+                g_mqtt_fatally_shutdown = 1;
+                break;
+            }
+        }
+
+        usleep(10 * 1000); // 10 ms
+    }
+
+    return NULL;
+}
+
+return_code_t initailize_mqtt_client(struct mqtt_config *cfg)
+{
+    s_cfg = cfg;
+    // --- Initialize MQTT ---
+    MQTTAsync_create(&s_client, cfg->broker, cfg->client_string_id, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    MQTTAsync_setCallbacks(s_client, s_client, connection_lost, mqtt_message_callback, NULL);
+
+    /* Start an MQTT connection monitoring thread - this thread will
+       ensure we have a working connection to the broker, with subscribing
+       to the proper MQTT topic.
+     */
+    int rc = pthread_create(&mqtt_connection_monitoring_thread, NULL, connection_monitoring_thread, NULL);
+    if (rc != RC_OK)
+        return RC_FAILURE;
+
+    return RC_OK;
 }
 
 void stop_mqtt_client()
