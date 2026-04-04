@@ -12,7 +12,8 @@
 
 typedef enum {
     ACTION_CALL,
-    ACTION_HANGUP
+    ACTION_HANGUP,
+    ACTION_HANGUP_ALL
 } action_type_t;
 
 typedef struct {

@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
 #include "sip.h"
 #include "mqtt.h"
@@ -19,7 +20,20 @@ extern volatile int g_sip_fatally_shutdown;
 
 extern return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, struct mqtt_config *mqtt_cfg);
 
+volatile sig_atomic_t g_stop = 0;
+
+void handle_sigint(int sig) {
+    g_stop = 1;
+}
+
 int main(int argc, char* argv[]) {
+    struct sigaction sa;
+    sa.sa_handler = handle_sigint;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    sigaction(SIGINT, &sa, NULL);
+
     int exit_code = 0;
 
     struct mqtt_config mqtt_cfg;
@@ -44,8 +58,10 @@ int main(int argc, char* argv[]) {
     rc = mqtt_client_connect_and_subscribe(RETRY_MAX);
     if (rc != RC_OK)
         return 1;
+
+    fprintf(stdout, "Running... Press Ctrl+C to stop\n");
     
-    while (1) {
+    while (!g_stop) {
         if (!g_mqtt_connected) {
             fprintf(stderr,"[MAIN] MQTT disconnected, trying to reconnect...\n");
             rc = mqtt_client_connect_and_subscribe(RETRY_MAX);
@@ -61,8 +77,11 @@ int main(int argc, char* argv[]) {
             exit_code = 1;
             break;
         }
+
         sleep(1); // Keep main thread alive
     }
+
+    printf("\n");
 
     stop_sip_client();
     stop_mqtt_client();

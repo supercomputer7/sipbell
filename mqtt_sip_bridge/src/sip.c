@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <pjsua-lib/pjsua.h>
+#include <signal.h>
 
 #include "sip.h"
 #include "sip_queue.h"
@@ -15,10 +16,12 @@
 #define PJSIP_AUTH_REALM "*"
 #define PJSIP_AUTH_SCHEME "digest"
 
+extern volatile sig_atomic_t g_stop;
+
 // --- PJSIP globals ---
 action_queue_t g_sip_queue;
 pthread_t sip_call_thread;
-pthread_t sip_connection_thread;
+pthread_t sip_registration_thread;
 pjsua_acc_id acc_id;
 pjsua_acc_config acc_cfg;
 
@@ -33,11 +36,14 @@ typedef struct {
 } call_context_t;
 call_context_t g_call_map[PJSUA_MAX_CALLS];
 
-// --- SIP connection flags ---
+// --- SIP registration flags ---
 
 volatile int g_sip_registered = 0;
 volatile int g_sip_registering = 0;
 volatile int g_sip_fatally_shutdown = 0;
+
+volatile sig_atomic_t g_sip_stop_registration_thread = 0;
+volatile sig_atomic_t g_sip_stop_all_threads = 0;
 
 void stop_call(pjsua_call_id timed_call_id)
 {
@@ -58,21 +64,21 @@ static void start_registration()
     }
 }
 
-void* pjsip_connection_thread(void* arg)
+void* pjsip_registration_thread(void* arg)
 {
     pj_thread_desc desc;
     pj_thread_t *thread;
     pj_status_t status;
 
     // Register the thread with PJSIP
-    status = pj_thread_register("connection_thread", desc, &thread);
+    status = pj_thread_register("registration_thread", desc, &thread);
     if (status != PJ_SUCCESS) {
         fprintf(stderr, "Failed to register thread\n");
         return NULL;
     }
 
     unsigned retry_count = 0;
-    while (1) {
+    while (!g_sip_stop_registration_thread) {
         pjsua_handle_events(100);
         if (!g_sip_registered && !g_sip_registering) {
             if (retry_count < 3) {
@@ -88,6 +94,10 @@ void* pjsip_connection_thread(void* arg)
             retry_count = 0;
         }
     }
+
+    fprintf(stderr, "[SIP] Exiting registration thread\n");
+
+    return NULL;
 }
 
 void* pjsip_call_thread(void* arg)
@@ -127,15 +137,41 @@ void* pjsip_call_thread(void* arg)
                     fprintf(stderr, "[SIP] Call hangup failed (not registered or transport issue)\n");
                 }
                 break;
+            case ACTION_HANGUP_ALL:
+                fprintf(stderr, "[SIP] Hanging up all calls\n");
+                pjsua_call_hangup_all();
+                fprintf(stderr, "[SIP] Hanging up all calls, done...\n");
+                // FIXME: This kinda a hack, but we hang up all calls and check if g_stop is set
+                // so we break out of the thread loop completely.
+                if (g_stop) {
+                    fprintf(stderr, "[SIP] Exiting call thread\n");
+                    return NULL;
+                }
+                break;
         }
     }
-    return NULL;
 }
 
 void on_reg_state(pjsua_acc_id acc_id)
 {
+    /* At this point, we don't have a registration anymore, 
+       so ignore every registation state change*/
+    if (g_sip_stop_all_threads)
+        return;
+
     pjsua_acc_info info;
     pjsua_acc_get_info(acc_id, &info);
+
+    if (g_stop) {
+        if (info.status == 200) {
+            fprintf(stderr, "[SIP] Un-registered successfully\n");
+        } else {
+            fprintf(stderr, "[SIP] Un-registered unsuccessfully, continue anyway...\n");
+        }
+
+        g_sip_registered = 0;
+        return;
+    }
 
     if (info.status == 200) {
         fprintf(stderr, "[SIP] Registered successfully\n");
@@ -278,14 +314,14 @@ return_code_t initialize_sip_client(struct sip_config *cfg)
     if (rc != RC_OK)
         return RC_FAILURE;
 
-    /* Start PJSIP threads - one for monitoring the connection
+    /* Start PJSIP threads - one for monitoring the registration
      * and another one for tracking call requests from a queue.
      */
     rc = pthread_create(&sip_call_thread, NULL, pjsip_call_thread, NULL);
     if (rc != RC_OK)
         return RC_FAILURE;
 
-    rc = pthread_create(&sip_connection_thread, NULL, pjsip_connection_thread, NULL);
+    rc = pthread_create(&sip_registration_thread, NULL, pjsip_registration_thread, NULL);
     if (rc != RC_OK)
         return RC_FAILURE;
 
@@ -294,13 +330,51 @@ return_code_t initialize_sip_client(struct sip_config *cfg)
 
 void stop_sip_client()
 {
+    for (int i = 0; i < PJSUA_MAX_CALLS; i++) {
+        struct thread_timer_t* t = &g_call_map[i].timer;
+        pthread_mutex_lock(&t->mutex);
+    }
+
+    action_t a = { .type = ACTION_HANGUP_ALL, .call_id = PJSUA_INVALID_ID };
+    queue_push(&g_sip_queue, a);
+
     pthread_join(sip_call_thread, NULL);
-    pthread_join(sip_connection_thread, NULL);
+
+    fprintf(stderr, "[SIP] Call handling thread stopped.\n");
+
+    /* Stop registration thread (registration attempts) completely from 
+       this point onwards */
+    g_sip_stop_registration_thread = true;
+
+    pjsua_acc_set_registration(acc_id, PJ_FALSE);
+
+    unsigned timeout_seconds = 0;
+    while (g_sip_registered && timeout_seconds < 5) {
+        sleep(1);
+        timeout_seconds++;
+    }
+
+    if (g_sip_registered)
+        fprintf(stderr, "[SIP] Unregistering failed, continue anyway...\n");
+
+    /* 
+     * Now that we stopped all calls and the handling thread, we can tear down the
+     * registration thread as well.
+     */
+
+    pthread_join(sip_registration_thread, NULL);
+
+    fprintf(stderr, "[SIP] Registration thread stopped.\n");
+
+    g_sip_stop_all_threads = true;
 
     for (int i = 0; i < PJSUA_MAX_CALLS; i++) {
         struct thread_timer_t* t = &g_call_map[i].timer;
+        pthread_mutex_unlock(&t->mutex);
         pthread_mutex_destroy(&t->mutex);
     }
 
     pjsua_destroy();
+
+    fprintf(stderr, "[SIP] Shutdown Complete.\n");
 }

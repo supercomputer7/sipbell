@@ -193,4 +193,5 @@ return_code_t mqtt_client_connect_and_subscribe(int max_retries)
 void stop_mqtt_client()
 {
     MQTTAsync_destroy(&s_client);
+    fprintf(stderr, "[MQTT] Shutdown Complete.\n");
 }
