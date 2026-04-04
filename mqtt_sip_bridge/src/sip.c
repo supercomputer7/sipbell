@@ -354,11 +354,6 @@ return_code_t initialize_sip_client(struct sip_config *cfg)
 
 void stop_sip_client()
 {
-    for (int i = 0; i < PJSUA_MAX_CALLS; i++) {
-        struct thread_timer_t* t = &g_call_map[i].timer;
-        pthread_mutex_lock(&t->mutex);
-    }
-
     action_t a = { .type = ACTION_HANGUP_ALL, .call_id = PJSUA_INVALID_ID };
     queue_push(&g_sip_queue, a);
 
@@ -394,7 +389,6 @@ void stop_sip_client()
 
     for (int i = 0; i < PJSUA_MAX_CALLS; i++) {
         struct thread_timer_t* t = &g_call_map[i].timer;
-        pthread_mutex_unlock(&t->mutex);
         pthread_mutex_destroy(&t->mutex);
     }
 
