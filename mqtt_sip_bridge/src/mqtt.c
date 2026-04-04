@@ -190,11 +190,6 @@ return_code_t mqtt_client_connect_and_subscribe(int max_retries)
     return RC_FAILURE;
 }
 
-bool mqtt_client_connected()
-{
-    return g_mqtt_connected;
-}
-
 void stop_mqtt_client()
 {
     MQTTAsync_destroy(&s_client);
