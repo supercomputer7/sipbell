@@ -65,6 +65,7 @@ int main(int argc, char* argv[]) {
         return 1;
 
     fprintf(stdout, "Running... Press Ctrl+C to stop\n");
+    fflush(stdout);
     
     while (!g_stop) {
         if (g_mqtt_fatally_shutdown) {
