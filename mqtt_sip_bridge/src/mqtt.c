@@ -95,7 +95,7 @@ return_code_t initailize_mqtt_client(struct mqtt_config *cfg)
 {
     s_cfg = cfg;
     // --- Initialize MQTT ---
-    MQTTAsync_create(&s_client, cfg->broker, "doorbell-mqtt2sip-bridge", MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    MQTTAsync_create(&s_client, cfg->broker, cfg->client_string_id, MQTTCLIENT_PERSISTENCE_NONE, NULL);
     MQTTAsync_setCallbacks(s_client, s_client, connection_lost, mqtt_message_callback, NULL);
 
     return RC_OK;

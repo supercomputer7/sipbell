@@ -21,6 +21,7 @@ void print_usage(const char *prog) {
     printf("  -t <topic>         MQTT topic (default: sip/call)\n");
     printf("  -u <user>          MQTT username (default: empty)\n");
     printf("  -p <pass>          MQTT password (default: empty)\n");
+    printf("  -i <client_id>     MQTT client ID string (default: mqtt2sip-bridge)\n");
 
     printf("\nSIP options:\n");
     printf("  -R <sip_host>                SIP server (default: localhost)\n");
@@ -63,6 +64,8 @@ return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, str
     // MQTT defaults
     strcpy(mqtt_cfg->broker, "tcp://localhost:1883");
     strcpy(mqtt_cfg->topic, "sip/call");
+    strcpy(mqtt_cfg->client_string_id, "mqtt2sip-bridge");
+
     mqtt_cfg->user[0] = '\0';
     mqtt_cfg->pass[0] = '\0';
     mqtt_cfg->port = 1883;
@@ -84,7 +87,7 @@ return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, str
 
     int opt;
 
-    while ((opt = getopt(argc, argv, "b:P:t:u:p:R:O:U:l:S:C:Tw:h")) != -1) {
+    while ((opt = getopt(argc, argv, "b:P:t:u:p:R:O:U:i:l:S:C:Tw:h")) != -1) {
         switch (opt) {
             case 'b': {
                 strncpy(mqtt_cfg->broker, optarg, sizeof(mqtt_cfg->broker)-1);
@@ -100,6 +103,11 @@ return_code_t parse_args(int argc, char *argv[], struct sip_config *sip_cfg, str
             } 
             case 'p': {
                 strncpy(mqtt_cfg->pass, optarg, sizeof(mqtt_cfg->pass)-1);
+                break;
+            }
+
+            case 'i': {
+                strncpy(mqtt_cfg->client_string_id, optarg, sizeof(mqtt_cfg->client_string_id)-1);
                 break;
             }
 

@@ -16,6 +16,7 @@ struct mqtt_config {
     char topic[128];
     char user[64];
     char pass[64];
+    char client_string_id[64];
 };
 
 return_code_t initailize_mqtt_client(struct mqtt_config *cfg);
